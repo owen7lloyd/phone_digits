@@ -1,14 +1,18 @@
+"""
+Streamlit app for phone_digit detection
+"""
+
 import streamlit as st
 import numpy as np
 
 from functools import partial
 
-from odat.mdat.phone_digits import mk_dacc
+from odat import daccs
 from slang import fixed_step_chunker
 from taped import list_recording_device_index_names, LiveWf
 from lined import LineParametrized
 
-from oscrap.ol.phone_digits_public.streamlit_controller import (
+from phone_digits.streamlit_controller import (
     store_in_ss,
     annotations,
     adjust_thresh,
@@ -19,11 +23,10 @@ from oscrap.ol.phone_digits_public.streamlit_controller import (
     stop,
     mk_featurizer_and_model,
 )
-from oscrap.ol.phone_digits_public.controller import (
+from phone_digits.controller import (
     threshold_chunker,
     threshold_featurizer,
     threshold_model,
-    mk_model,
     encode_dol,
     decode_dol,
     DFLT_CHK_SIZE,
@@ -31,8 +34,6 @@ from oscrap.ol.phone_digits_public.controller import (
     MetricOptimizedThreshold,
     mk_thresh_df,
     mk_thresh_chks,
-    mk_chks_and_tags,
-    mk_featurizer,
     normalize_wf,
     plot_wf,
     barplot_thresh,
@@ -56,7 +57,7 @@ if train == "Yes":
     )
 
     if st.session_state.zip_path != "":
-        store_in_ss("dacc", mk_dacc(st.session_state.zip_path))
+        store_in_ss("dacc", daccs['phone_digits']['mk_dacc'](st.session_state.zip_path))
         store_in_ss("wfs_and_tags", list(st.session_state.dacc.wf_tag_gen()))
         store_in_ss("chks", list(threshold_chunker(st.session_state.wfs_and_tags)))
         store_in_ss("thresh_fvs", list(threshold_featurizer(st.session_state.chks)))

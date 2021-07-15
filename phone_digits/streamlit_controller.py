@@ -1,3 +1,7 @@
+"""
+Controller for streamlit app that needs session_state access
+"""
+
 import streamlit as st
 import numpy as np
 import random
@@ -7,7 +11,7 @@ from functools import partial
 from slang import fixed_step_chunker
 from taped import LiveWf
 
-from oscrap.ol.phone_digits_public.controller import (
+from phone_digits.controller import (
     get_cont_intervals,
     DFLT_CHK_SIZE,
     DFLT_CHK_STEP,

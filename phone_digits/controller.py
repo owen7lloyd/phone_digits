@@ -1,3 +1,7 @@
+"""
+Controller for streamlit app
+"""
+
 import numpy as np
 import pandas as pd
 import soundfile as sf
