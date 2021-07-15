@@ -23,7 +23,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip -q install axblack pytest pylint isee
-          isee install-requires
+          isee install_requires
 
       - name: Format source code
         run: black  --line-length=88 .
