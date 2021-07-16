@@ -7,10 +7,10 @@ import numpy as np
 
 from functools import partial
 
-from odat import daccs
 from slang import fixed_step_chunker
 from taped import list_recording_device_index_names, LiveWf
 
+from phone_digits_dacc import mk_dacc
 from streamlit_controller import (
     store_in_ss,
     annotations,
@@ -25,7 +25,6 @@ from streamlit_controller import (
 from controller import (
     threshold_chunker,
     threshold_featurizer,
-    threshold_model,
     encode_dol,
     decode_dol,
     DFLT_CHK_SIZE,
@@ -57,7 +56,7 @@ if train == "Yes":
     )
 
     if st.session_state.zip_path != "":
-        store_in_ss("dacc", daccs["phone_digits"]["mk_dacc"](st.session_state.zip_path))
+        store_in_ss("dacc", mk_dacc(st.session_state.zip_path))
         store_in_ss("wfs_and_tags", list(st.session_state.dacc.wf_tag_gen()))
         store_in_ss("chks", list(threshold_chunker(st.session_state.wfs_and_tags)))
         store_in_ss("thresh_fvs", list(threshold_featurizer(st.session_state.chks)))
