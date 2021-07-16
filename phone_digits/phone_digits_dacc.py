@@ -2,8 +2,7 @@
 From odat.mdat.phone_digits written for this app
 """
 
-from py2store.slib.s_zipfile import ZipReader
-from py2store import wrap_kvs, filt_iter
+from py2store import wrap_kvs, filt_iter, FilesOfZip
 import soundfile as sf
 from io import BytesIO
 from slang import KvDataSource
@@ -12,15 +11,23 @@ import numpy as np
 from sklearn.preprocessing import normalize
 
 
+@wrap_kvs(obj_of_data=lambda b: sf.read(BytesIO(b), dtype="int16")[0])
+@filt_iter(
+    filt=lambda x: not x.startswith("__MACOSX")
+    and x.startswith("train/")
+    and x.endswith(".wav")
+)
+class WfStore(FilesOfZip):
+    pass
+
+
 def mk_dacc(zip_dir):
     return Dacc(zip_dir=zip_dir)
 
 
 def mk_ds(zip_dir):
-    s = ZipReader(zip_dir)
-    _wf_store = filt_iter(s, filt=lambda x: x.startswith("train/"))
-    _wf_store = filt_iter(_wf_store, filt=lambda x: x.endswith(".wav"))
-    wf_store = wrap_kvs(_wf_store, obj_of_data=lambda v: sf.read(BytesIO(v))[0])
+    s = WfStore(zip_dir)
+
     path_component = re.compile("[^_]+")
 
     def key(x):
@@ -28,7 +35,7 @@ def mk_ds(zip_dir):
         if m:
             return int(m.group(0)[-1])
 
-    ds = KvDataSource(wf_store, key_to_tag=key)
+    ds = KvDataSource(s, key_to_tag=key)
     return ds
 
 

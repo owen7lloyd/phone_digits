@@ -5,8 +5,10 @@ Controller for streamlit app that needs session_state access
 import streamlit as st
 import numpy as np
 import random
+import base64
 
 from functools import partial
+from pickle import dumps, loads
 
 from slang import fixed_step_chunker
 from taped import LiveWf
@@ -16,7 +18,7 @@ from controller import (
     DFLT_CHK_SIZE,
     DFLT_CHK_STEP,
     chk_tag_gen,
-    save_audio_for_st,
+    plot_wf,
     mk_thresh_df,
     barplot_thresh,
     mk_thresh_chks,
@@ -28,6 +30,17 @@ from controller import (
     mk_featurizer,
     mk_model,
 )
+
+
+# -------------------------------DOWNLOAD UTILS-------------------------------
+
+
+def download_model(model, type):
+    output_model = dumps(model)
+    b64 = base64.b64encode(output_model).decode()
+    href = f'<a href="data:file/output_model;base64,{b64}" download="{type}.pkl">Download trained {type} .pkl file</a>'
+    st.sidebar.markdown(href, unsafe_allow_html=True)
+
 
 # -------------------------------STREAMLIT UTILS-------------------------------
 
@@ -57,18 +70,21 @@ def annotations():
 
     st.write("")
     col1, col2 = st.beta_columns(2)
-    dir = st.session_state.zip_path[
-        : -len(st.session_state.zip_path.split("/")[-1]) - 1
-    ]
-    save_audio_for_st(
-        np.hstack(
-            st.session_state.chks[
-                st.session_state.current_chk - 1 : st.session_state.current_chk + 1
-            ]
-        ),
-        dir,
-    )
-    col1.audio(f"{dir}/chk.wav")
+    # dir = st.session_state.zip_path[
+    #     : -len(st.session_state.zip_path.split("/")[-1]) - 1
+    # ]
+    # save_audio_for_st(
+    #     np.hstack(
+    #         st.session_state.chks[
+    #             st.session_state.current_chk - 1 : st.session_state.current_chk + 1
+    #         ]
+    #     ),
+    #     dir,
+    # )
+    # col1.audio(f"{dir}/chk.wav")
+
+    with col1:
+        st.pyplot(plot_wf(st.session_state.chks[st.session_state.current_chk], linewidth=0.8))
     with col2:
         if len(st.session_state.random_chk_ids) > 0:
             st.write(

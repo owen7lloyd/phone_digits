@@ -21,6 +21,7 @@ from streamlit_controller import (
     write_intervals,
     stop,
     mk_featurizer_and_model,
+    download_model,
 )
 from controller import (
     threshold_chunker,
@@ -45,18 +46,21 @@ st.title("Phone Digits")
 train = st.selectbox("Would you like to train a new model?", ["Yes", "No"])
 
 if train == "Yes":
-    st.session_state.zip_path = st.text_input(
-        "What is your path to the phone_digits training data?",
-        "" if "zip_path" not in st.session_state else st.session_state.zip_path,
+    st.session_state.zip_file = st.file_uploader(
+        label="Please upload the phone_digits training data!"
     )
+    # st.session_state.zip_path = st.text_input(
+    #     "What is your path to the phone_digits training data?",
+    #     "" if "zip_path" not in st.session_state else st.session_state.zip_path,
+    # )
 
     st.write(
         "If you do not have the phone_digits training "
         "data it can be found [here](https://www.dropbox.com/s/irbaaopwy1cpv5x/phone_digits_train.zip?dl=0)."
     )
 
-    if st.session_state.zip_path != "":
-        store_in_ss("dacc", mk_dacc(st.session_state.zip_path))
+    if st.session_state.zip_file:
+        store_in_ss("dacc", mk_dacc(st.session_state.zip_file))
         store_in_ss("wfs_and_tags", list(st.session_state.dacc.wf_tag_gen()))
         store_in_ss("chks", list(threshold_chunker(st.session_state.wfs_and_tags)))
         store_in_ss("thresh_fvs", list(threshold_featurizer(st.session_state.chks)))
@@ -88,9 +92,9 @@ if train == "Yes":
                 model_choice = st.selectbox(
                     "Which model would you like to use?",
                     options=[
+                        "Support Vector Machine",
                         "Random Forest",
                         "K-Nearest Neighbors",
-                        "Support Vector Machine",
                     ],
                 )
             store_in_ss(
@@ -116,23 +120,18 @@ if train == "Yes":
                 args=(featurizer_choice, model_choice),
             )
 
-        if "fvs" in st.session_state:
-            save = st.button(
-                "Click here to persist your featurizer and model",
-                on_click=encode_dol,
-                args=(
-                    st.session_state.featurizer,
-                    st.session_state.model,
-                    st.session_state.fvs,
-                    st.session_state.tags,
-                    st.session_state.thresh,
-                    st.session_state.zip_path[
-                        : -len(st.session_state.zip_path.split("/")[-1]) - 1
-                    ],
-                ),
+        if "model" in st.session_state and "featurizer" in st.session_state:
+            st.button(
+                "Click here to save your model",
+                on_click=download_model,
+                args=(st.session_state.model, 'model'),
             )
-            if save:
-                st.success(f"🎈 Done! Your featurizer and model have been persisted!")
+            st.button(
+                "Click here to save your featurizer",
+                on_click=download_model,
+                args=(st.session_state.featurizer, 'featurizer'),
+            )
+
 
 if train == "No":
     st.session_state.dir = st.text_input(
@@ -149,7 +148,7 @@ if train == "No":
         store_in_ss("model", model)
         st.success(f"🎈 Done! Your featurizer and model have been successfully decoded!")
 
-if "model" in st.session_state:
+if "fvs" in st.session_state:
     st.markdown("""---""")
 
     scores = st.session_state.model.predict(st.session_state.fvs)
@@ -159,6 +158,7 @@ if "model" in st.session_state:
         f"of the digits pressed in the training data"
     )
 
+if "model" in st.session_state:
     st.markdown("""---""")
 
     st.write(

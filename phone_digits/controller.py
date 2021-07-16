@@ -21,7 +21,6 @@ from sklearn.svm import SVC
 
 from scipy.optimize import minimize_scalar
 from pickle import dump, load
-
 from slang import fixed_step_chunker
 from recode import ChunkedEncoder, ChunkedDecoder, StructCodecSpecs
 from py2store import LocalBinaryStore
@@ -395,12 +394,12 @@ def charts_for_live(live_wf, chk_stop, chunker, thresh, featurizer, model):
 # -------------------------------PLOTTING UTILS-------------------------------
 
 
-def plot_wf(wf):
+def plot_wf(wf, linewidth=0.2):
     """
     Returns a matplotlib.pyplot figure of a waveform to be passed to st.pyplot
     """
     plt.figure()
-    plt.plot(wf, linewidth=0.2)
+    plt.plot(wf, linewidth=linewidth)
     plt.ylim(bottom=-0.0075, top=0.0075)
     return plt
 
