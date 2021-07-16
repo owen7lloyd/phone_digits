@@ -144,7 +144,7 @@ def mk_featurizer_and_model(featurizer_choice, model_choice):
 
 
 def record(input_device, length):
-    with LiveWf(input_device) as live_audio_stream:
+    with LiveWf() as live_audio_stream:
         wf = np.array(live_audio_stream[22_050 : 22_050 + length * 44_100])
     st.session_state.wf = wf
 
