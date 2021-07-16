@@ -9,6 +9,7 @@ import base64
 
 from functools import partial
 from pickle import dumps, loads
+from io import BytesIO
 
 from slang import fixed_step_chunker
 from taped import LiveWf
@@ -35,11 +36,15 @@ from controller import (
 # -------------------------------DOWNLOAD UTILS-------------------------------
 
 
-def persist_sklearn(model, type):
+def download_model(model, model_type, col):
     output_model = dumps(model)
     b64 = base64.b64encode(output_model).decode()
-    href = f'<a href="data:file/output_model;base64,{b64}" download="{type}.pkl">Download trained {type} .pkl file</a>'
-    st.sidebar.markdown(href, unsafe_allow_html=True)
+    href = f'<a href="data:file/output_model;base64,{b64}" download="{model_type}.pkl">Download trained {model_type} .pkl file</a>'
+    col.markdown(href, unsafe_allow_html=True)
+
+
+def upload_model(file):
+    return loads(file.read())
 
 
 # -------------------------------STREAMLIT UTILS-------------------------------
@@ -84,7 +89,9 @@ def annotations():
     # col1.audio(f"{dir}/chk.wav")
 
     with col1:
-        st.pyplot(plot_wf(st.session_state.chks[st.session_state.current_chk], linewidth=0.8))
+        st.pyplot(
+            plot_wf(st.session_state.chks[st.session_state.current_chk], linewidth=0.8)
+        )
     with col2:
         if len(st.session_state.random_chk_ids) > 0:
             st.write(

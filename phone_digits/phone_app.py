@@ -21,13 +21,12 @@ from streamlit_controller import (
     write_intervals,
     stop,
     mk_featurizer_and_model,
-    persist_sklearn,
+    download_model,
+    upload_model,
 )
 from controller import (
     threshold_chunker,
     threshold_featurizer,
-    encode_dol,
-    decode_dol,
     DFLT_CHK_SIZE,
     DFLT_CHK_STEP,
     MetricOptimizedThreshold,
@@ -98,10 +97,14 @@ if train == "Yes":
                     ],
                 )
             store_in_ss(
+                "mot",
+                MetricOptimizedThreshold().fit(
+                    st.session_state.wfs_and_tags, st.session_state.annotations
+                ),
+            )
+            store_in_ss(
                 "thresh",
-                MetricOptimizedThreshold()
-                .fit(st.session_state.wfs_and_tags, st.session_state.annotations)
-                .score(),
+                st.session_state.mot.score(),
             )
             store_in_ss(
                 "thresh_df",
@@ -121,32 +124,44 @@ if train == "Yes":
             )
 
         if "model" in st.session_state and "featurizer" in st.session_state:
-            st.button(
-                "Click here to save your model",
-                on_click=persist_sklearn,
-                args=(st.session_state.model, 'model', ),
-            )
-            st.button(
-                "Click here to save your featurizer",
-                on_click=persist_sklearn,
-                args=(st.session_state.featurizer, 'featurizer', ),
-            )
+            col1, col2 = st.beta_columns(2)
+            with col1:
+                st.button(
+                    "Click here to save your model",
+                    on_click=download_model,
+                    args=(st.session_state.model, "model", col2),
+                )
+                st.button(
+                    "Click here to save your featurizer",
+                    on_click=download_model,
+                    args=(st.session_state.featurizer, "featurizer", col2),
+                )
+                st.button(
+                    "Click here to save your metric optimized threshold",
+                    on_click=download_model,
+                    args=(st.session_state.mot, "mot", col2),
+                )
 
 
 if train == "No":
-    st.session_state.dir = st.text_input(
-        "Where are your persisted fvs and tags?",
-        "" if "dir" not in st.session_state else st.session_state.dir,
+    model_pkl = st.file_uploader(
+        label="Please upload your model.pkl file here", type="pkl"
+    )
+    featurizer_pkl = st.file_uploader(
+        label="Please upload your featurizer.pkl file here", type="pkl"
+    )
+    mot_pkl = st.file_uploader(
+        label="Please upload your mot.pkl file here", type="pkl"
     )
 
-    if st.session_state.dir != "":
-        fvs, tags, thresh, featurizer, model = decode_dol(st.session_state.dir)
-        store_in_ss("fvs", fvs)
-        store_in_ss("tags", tags)
-        store_in_ss("thresh", thresh)
-        store_in_ss("featurizer", featurizer)
-        store_in_ss("model", model)
-        st.success(f"🎈 Done! Your featurizer and model have been successfully decoded!")
+    if model_pkl and featurizer_pkl and mot_pkl:
+        st.session_state.model = upload_model(model_pkl)
+        st.session_state.featurizer = upload_model(featurizer_pkl)
+        try:
+            st.session_state.thresh = upload_model(featurizer_pkl).score()
+        except EOFError:
+            st.session_state.thresh = 0.0037
+        st.success(f"🎈 Done! Your featurizer, model, and metric optimized threshold have been successfully decoded!")
 
 if "fvs" in st.session_state:
     st.markdown("""---""")
