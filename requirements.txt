@@ -4,7 +4,6 @@ numpy~=1.20.3
 odat~=0.0.9
 slang~=0.0.7
 taped~=0.0.7
-lined~=0.0.30
 pandas~=1.2.4
 soundfile~=0.10.3.post1
 matplotlib~=3.4.2

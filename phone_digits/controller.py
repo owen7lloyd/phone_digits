@@ -22,7 +22,6 @@ from sklearn.svm import SVC
 from scipy.optimize import minimize_scalar
 from pickle import dump, load
 
-from lined import LineParametrized
 from slang import fixed_step_chunker
 from recode import ChunkedEncoder, ChunkedDecoder, StructCodecSpecs
 from py2store import LocalBinaryStore
@@ -153,10 +152,11 @@ def chk_tag_gen(wf_tag_iter, chunker):
 def mk_thresh_df(wfs_and_tags, thresh):
     """
     Returns a dataframe indicating which chunks exceed the given thresh
+    This is supposed to use intensity gen but need to remove because of python version 3.7 for streamlit sharing
     """
     return pd.DataFrame(
-        intensity_gen(
-            wfs_and_tags=wfs_and_tags,
+        threshold_model(
+            threshold_featurizer(threshold_chunker(wfs_and_tags=wfs_and_tags)),
             thresh=thresh,
         ),
         columns=["meets_thresh", "chk"],
@@ -356,7 +356,7 @@ def mk_number(results):
     return number
 
 
-def charts_for_live(live_wf, chk_stop, chunker, temp_gen, thresh, featurizer, model):
+def charts_for_live(live_wf, chk_stop, chunker, thresh, featurizer, model):
     """
     Generates charts to be plotted by streamlit using a live waveform from taped to view stats in real-time
     """
@@ -369,9 +369,9 @@ def charts_for_live(live_wf, chk_stop, chunker, temp_gen, thresh, featurizer, mo
         chks_and_tags.append([chk, 11])
 
     test_thresh_df = pd.DataFrame(
-        temp_gen(
-            chks=chks,
-            thresh=thresh,
+        threshold_model(
+            threshold_featurizer(chks),
+            thresh,
         ),
         columns=["meets_thresh", "chk"],
     )
@@ -513,13 +513,76 @@ def threshold_model(fvs, thresh):
             yield 0, idx
 
 
+class MetricOptimizedThreshold(BaseEstimator):
+    """
+    >>> wfs, tags = [[1, 2, 3, 4], [5, 6, 7, 8]], ['foo', 'bar']
+    >>> wfs_and_tags = list(zip(wfs, tags))
+    >>> annots = {0: 0, 3: 1}
+    >>> mot = MetricOptimizedThreshold(0, 10, 2, 2)
+    >>> mot.fit(wfs_and_tags, annots)
+    MetricOptimizedThreshold(chk_size=2, chk_step=2, upper_bound=10)
+    >>> assert mot.score() == 6.180345159275205
+    """
+
+    def __init__(
+        self,
+        lower_bound=0,
+        upper_bound=0.006,
+        chk_size=DFLT_CHK_SIZE,
+        chk_step=DFLT_CHK_STEP,
+        metric=accuracy_score,
+    ):
+        self.lower_bound = lower_bound
+        self.upper_bound = upper_bound
+        self.metric = metric
+        self.chk_size = chk_size
+        self.chk_step = chk_step
+
+    def fit(self, X, y):
+        chk_ids = sorted(list(y.keys()))
+        truth = [y[key] for key in chk_ids]
+
+        def opt_func(thresh):
+            thresh_results = np.array(
+                list(
+                    threshold_model(
+                        threshold_featurizer(
+                            threshold_chunker(
+                                wfs_and_tags=X,
+                                chk_size=self.chk_size,
+                                chk_step=self.chk_step,
+                            )
+                        ),
+                        thresh=thresh,
+                    )
+                )
+            )
+            pred = [int(thresh_results[chk_id][0]) for chk_id in chk_ids]
+            score = self.metric(truth, pred)
+            return -1.0 * score
+
+        optimize_result = minimize_scalar(
+            fun=opt_func,
+            method="bounded",
+            bounds=[self.lower_bound, self.upper_bound],
+        )
+
+        self.thresh_ = optimize_result["x"]
+
+        return self
+
+    def score(self):
+        return self.thresh_
+
+
+"""
 intensity_gen = LineParametrized(
     threshold_chunker, threshold_featurizer, threshold_model
 )
 
 
 class MetricOptimizedThreshold(BaseEstimator):
-    """
+    
     This class is designed to take in an iterator of wfs and tags and annotations on chunks of a subset of those wfs and
     tags, indicating whether the chunk is the desired event or just background noise. These annotations are then used
     to adjust the threshold value passed to intensity_gen to predict the same chunks that were used for annotations,
@@ -531,7 +594,7 @@ class MetricOptimizedThreshold(BaseEstimator):
     >>> mot.fit(wfs_and_tags, annots)
     MetricOptimizedThreshold(chk_size=2, chk_step=2, upper_bound=10)
     >>> assert mot.score() == 6.180345159275205
-    """
+    
 
     def __init__(
         self,
@@ -578,3 +641,4 @@ class MetricOptimizedThreshold(BaseEstimator):
 
     def score(self):
         return self.thresh_
+"""

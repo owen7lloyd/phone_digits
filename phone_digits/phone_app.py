@@ -10,7 +10,6 @@ from functools import partial
 from odat import daccs
 from slang import fixed_step_chunker
 from taped import list_recording_device_index_names, LiveWf
-from lined import LineParametrized
 
 from streamlit_controller import (
     store_in_ss,
@@ -246,7 +245,6 @@ if "live" in st.session_state:
 
         st.button("Press here to stop!", on_click=stop)
 
-        store_in_ss("temp_gen", LineParametrized(threshold_featurizer, threshold_model))
         store_in_ss("chk_stop", 8192)
         store_in_ss(
             "chunker",
@@ -263,7 +261,6 @@ if "live" in st.session_state:
                 st.session_state.live_wf,
                 st.session_state.chk_stop,
                 st.session_state.chunker,
-                st.session_state.temp_gen,
                 st.session_state.thresh,
                 st.session_state.featurizer,
                 st.session_state.model,
