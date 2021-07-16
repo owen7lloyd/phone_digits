@@ -12,7 +12,7 @@ from slang import fixed_step_chunker
 from taped import list_recording_device_index_names, LiveWf
 from lined import LineParametrized
 
-from phone_digits.streamlit_controller import (
+from streamlit_controller import (
     store_in_ss,
     annotations,
     adjust_thresh,
@@ -23,7 +23,7 @@ from phone_digits.streamlit_controller import (
     stop,
     mk_featurizer_and_model,
 )
-from phone_digits.controller import (
+from controller import (
     threshold_chunker,
     threshold_featurizer,
     threshold_model,
@@ -39,6 +39,7 @@ from phone_digits.controller import (
     barplot_thresh,
     barplot_colored,
     charts_for_live,
+    mk_event_location_plot,
 )
 
 st.title("Phone Digits")
@@ -57,7 +58,7 @@ if train == "Yes":
     )
 
     if st.session_state.zip_path != "":
-        store_in_ss("dacc", daccs['phone_digits']['mk_dacc'](st.session_state.zip_path))
+        store_in_ss("dacc", daccs["phone_digits"]["mk_dacc"](st.session_state.zip_path))
         store_in_ss("wfs_and_tags", list(st.session_state.dacc.wf_tag_gen()))
         store_in_ss("chks", list(threshold_chunker(st.session_state.wfs_and_tags)))
         store_in_ss("thresh_fvs", list(threshold_featurizer(st.session_state.chks)))
@@ -73,18 +74,6 @@ if train == "Yes":
         st.session_state.annotated = annotations()
 
         if st.session_state.annotated:
-            store_in_ss(
-                "thresh",
-                MetricOptimizedThreshold()
-                .fit(st.session_state.wfs_and_tags, st.session_state.annotations)
-                .score(),
-            )
-            store_in_ss(
-                "thresh_df",
-                mk_thresh_df(st.session_state.wfs_and_tags, st.session_state.thresh),
-            )
-            store_in_ss("thresh_chks", mk_thresh_chks(st.session_state.thresh_df))
-
             st.markdown("""---""")
 
             col1, col2 = st.beta_columns(2)
@@ -97,6 +86,7 @@ if train == "Yes":
                         "T-Distributed Stochastic Neighbour Embedding (T-SNE)",
                     ],
                 )
+            with col2:
                 model_choice = st.selectbox(
                     "Which model would you like to use?",
                     options=[
@@ -105,46 +95,28 @@ if train == "Yes":
                         "Support Vector Machine",
                     ],
                 )
-            with col2:
-                chk_size = st.number_input(
-                    "What would you like to use as your chunk size?",
-                    value=DFLT_CHK_SIZE,
-                )
-                chk_step = st.number_input(
-                    "What would you like to use as your chunk step?",
-                    value=DFLT_CHK_STEP,
-                )
+            store_in_ss(
+                "thresh",
+                MetricOptimizedThreshold()
+                .fit(st.session_state.wfs_and_tags, st.session_state.annotations)
+                .score(),
+            )
+            store_in_ss(
+                "thresh_df",
+                mk_thresh_df(
+                    st.session_state.wfs_and_tags,
+                    st.session_state.thresh,
+                ),
+            )
+            store_in_ss("thresh_chks", mk_thresh_chks(st.session_state.thresh_df))
 
             st.markdown("""---""")
 
             st.button(
                 "Click here to build your featurizer and model",
                 on_click=mk_featurizer_and_model,
-                args=(chk_size, chk_step, featurizer_choice, model_choice),
+                args=(featurizer_choice, model_choice),
             )
-
-            # if (
-            #     "featurizer" not in st.session_state
-            #     or "fvs" not in st.session_state
-            #     or "tags" not in st.session_state
-            #     or "model" not in st.session_state
-            # ):
-            #     chks, tags = mk_chks_and_tags(
-            #         st.session_state.dacc,
-            #         partial(
-            #             fixed_step_chunker,
-            #             chk_size=int(chk_size),
-            #             chk_step=int(chk_step),
-            #         ),
-            #         st.session_state.thresh_chks,
-            #     )
-            #     fvs, featurizer = mk_featurizer(chks, tags, featurizer_choice)
-            #     model = mk_model(fvs, tags, model_choice)
-            #
-            #     st.session_state.featurizer = featurizer
-            #     st.session_state.model = model
-            #     st.session_state.fvs = fvs
-            #     st.session_state.tags = tags
 
         if "fvs" in st.session_state:
             save = st.button(
@@ -223,7 +195,9 @@ if "live" in st.session_state:
 
             st.session_state.test_wf_tag_gen = [(normalized_wf, 11)]
             st.session_state.test_chks = list(
-                threshold_chunker(st.session_state.test_wf_tag_gen)
+                threshold_chunker(
+                    st.session_state.test_wf_tag_gen,
+                )
             )
             st.session_state.test_fvs = list(
                 threshold_featurizer(st.session_state.test_chks)
@@ -233,7 +207,8 @@ if "live" in st.session_state:
                 barplot_thresh(st.session_state.test_fvs, st.session_state.thresh)
             )
             test_thresh_df = mk_thresh_df(
-                st.session_state.test_wf_tag_gen, st.session_state.thresh
+                st.session_state.test_wf_tag_gen,
+                st.session_state.thresh,
             )
             write_intervals(test_thresh_df, st.session_state.thresh)
 
@@ -255,6 +230,7 @@ if "live" in st.session_state:
             st.pyplot(
                 barplot_colored(st.session_state.test_fvs, st.session_state.results)
             )
+            st.pyplot(mk_event_location_plot(st.session_state.results))
             st.success(
                 "The detected phone digits are "
                 + "".join([str(num) for num in st.session_state.numbers])
@@ -273,7 +249,8 @@ if "live" in st.session_state:
         store_in_ss("temp_gen", LineParametrized(threshold_featurizer, threshold_model))
         store_in_ss("chk_stop", 8192)
         store_in_ss(
-            "chunker", partial(fixed_step_chunker, chk_size=2048, chk_step=2048)
+            "chunker",
+            partial(fixed_step_chunker, chk_size=DFLT_CHK_SIZE, chk_step=DFLT_CHK_STEP),
         )
 
         while st.session_state.pressed:

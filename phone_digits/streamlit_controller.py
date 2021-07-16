@@ -11,7 +11,7 @@ from functools import partial
 from slang import fixed_step_chunker
 from taped import LiveWf
 
-from phone_digits.controller import (
+from controller import (
     get_cont_intervals,
     DFLT_CHK_SIZE,
     DFLT_CHK_STEP,
@@ -82,9 +82,6 @@ def annotations():
         else:
             st.success(f"🎈 Done! All the sample chunks are annotated.")
             return True
-        # st.write("### Annotations")
-        # st.write(pd.DataFrame(st.session_state.annotations, columns=["id", "tag"]))
-        # st.write(st.session_state.annotations)
 
 
 def write_intervals(thresh_df, thresh):
@@ -101,13 +98,13 @@ def clear_recording():
             st.session_state.__delattr__(key)
 
 
-def mk_featurizer_and_model(chk_size, chk_step, featurizer_choice, model_choice):
+def mk_featurizer_and_model(featurizer_choice, model_choice):
     chks, tags = mk_chks_and_tags(
         st.session_state.dacc,
         partial(
             fixed_step_chunker,
-            chk_size=int(chk_size),
-            chk_step=int(chk_step),
+            chk_size=DFLT_CHK_SIZE,
+            chk_step=DFLT_CHK_STEP,
         ),
         st.session_state.thresh_chks,
     )
@@ -161,13 +158,7 @@ def run_model():
     test_thresh_chks = mk_thresh_chks(test_thresh_df)
 
     chunker = partial(
-        fixed_step_chunker,
-        chk_size=DFLT_CHK_SIZE
-        if "chk_size" not in st.session_state
-        else st.session_state.chk_size,
-        chk_step=DFLT_CHK_STEP
-        if "chk_step" not in st.session_state
-        else st.session_state.chk_step,
+        fixed_step_chunker, chk_size=DFLT_CHK_SIZE, chk_step=DFLT_CHK_STEP
     )
 
     chks_and_tags_enum = list(
