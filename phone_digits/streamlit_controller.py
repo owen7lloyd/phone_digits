@@ -35,7 +35,7 @@ from controller import (
 # -------------------------------DOWNLOAD UTILS-------------------------------
 
 
-def download_model(model, type):
+def persist_sklearn(model, type):
     output_model = dumps(model)
     b64 = base64.b64encode(output_model).decode()
     href = f'<a href="data:file/output_model;base64,{b64}" download="{type}.pkl">Download trained {type} .pkl file</a>'

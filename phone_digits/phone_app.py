@@ -21,7 +21,7 @@ from streamlit_controller import (
     write_intervals,
     stop,
     mk_featurizer_and_model,
-    download_model,
+    persist_sklearn,
 )
 from controller import (
     threshold_chunker,
@@ -123,13 +123,13 @@ if train == "Yes":
         if "model" in st.session_state and "featurizer" in st.session_state:
             st.button(
                 "Click here to save your model",
-                on_click=download_model,
-                args=(st.session_state.model, 'model'),
+                on_click=persist_sklearn,
+                args=(st.session_state.model, 'model', ),
             )
             st.button(
                 "Click here to save your featurizer",
-                on_click=download_model,
-                args=(st.session_state.featurizer, 'featurizer'),
+                on_click=persist_sklearn,
+                args=(st.session_state.featurizer, 'featurizer', ),
             )
 
 
