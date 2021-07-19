@@ -5,11 +5,6 @@ Streamlit app for phone_digit detection
 import streamlit as st
 import numpy as np
 
-from functools import partial
-
-from slang import fixed_step_chunker
-from taped import list_recording_device_index_names, LiveWf
-
 from phone_digits_dacc import mk_dacc
 from streamlit_controller import (
     store_in_ss,
@@ -17,27 +12,23 @@ from streamlit_controller import (
     adjust_thresh,
     clear_recording,
     run_model,
-    record,
     write_intervals,
-    stop,
     mk_featurizer_and_model,
     download_model,
-    upload_model,
 )
 from controller import (
     threshold_chunker,
     threshold_featurizer,
-    DFLT_CHK_SIZE,
-    DFLT_CHK_STEP,
     MetricOptimizedThreshold,
     mk_thresh_df,
     mk_thresh_chks,
-    normalize_wf,
+    normalize_wf_upload,
     plot_wf,
     barplot_thresh,
     barplot_colored,
-    charts_for_live,
     mk_event_location_plot,
+    upload_model,
+    upload_audio,
 )
 
 st.title("Phone Digits")
@@ -48,10 +39,6 @@ if train == "Yes":
     st.session_state.zip_file = st.file_uploader(
         label="Please upload the phone_digits training data!"
     )
-    # st.session_state.zip_path = st.text_input(
-    #     "What is your path to the phone_digits training data?",
-    #     "" if "zip_path" not in st.session_state else st.session_state.zip_path,
-    # )
 
     st.write(
         "If you do not have the phone_digits training "
@@ -150,9 +137,7 @@ if train == "No":
     featurizer_pkl = st.file_uploader(
         label="Please upload your featurizer.pkl file here", type="pkl"
     )
-    mot_pkl = st.file_uploader(
-        label="Please upload your mot.pkl file here", type="pkl"
-    )
+    mot_pkl = st.file_uploader(label="Please upload your mot.pkl file here", type="pkl")
 
     if model_pkl and featurizer_pkl and mot_pkl:
         st.session_state.model = upload_model(model_pkl)
@@ -161,7 +146,9 @@ if train == "No":
             st.session_state.thresh = upload_model(featurizer_pkl).score()
         except EOFError:
             st.session_state.thresh = 0.0037
-        st.success(f"🎈 Done! Your featurizer, model, and metric optimized threshold have been successfully decoded!")
+        st.success(
+            f"🎈 Done! Your featurizer, model, and metric optimized threshold have been successfully decoded!"
+        )
 
 if "fvs" in st.session_state:
     st.markdown("""---""")
@@ -176,128 +163,50 @@ if "fvs" in st.session_state:
 if "model" in st.session_state:
     st.markdown("""---""")
 
-    st.write(
-        "If you are planning to use the live output option, "
-        "it is recommended that you restart the page and select to not train a new model for better performance."
+    test_audio = st.file_uploader(
+        label="Please upload an audio file you would like to test", type=['wav', 'aiff', 'flac']
     )
 
-    st.session_state.live = st.selectbox(
-        "Would you prefer to make a recording or see results live?",
-        ["Recording", "Live"],
-    )
+    if test_audio:
+        st.session_state.wf, _ = upload_audio(test_audio)
 
+    if "wf" in st.session_state:
+        wf = np.float()
+        normalized_wf = normalize_wf_upload(st.session_state.wf)
 
-if "live" in st.session_state:
-    mic = st.selectbox(
-        "Which microphone would you like to use?",
-        list_recording_device_index_names(),
-    )
-    if st.session_state.live == "Recording":
-        time = st.number_input(
-            "How long would you like the recording to be?",
-            min_value=0,
-            max_value=15,
-            value=5,
-        )
-        st.button("Press here to record", on_click=record, args=(mic, time))
+        st.pyplot(plot_wf(normalized_wf))
 
-        if "wf" in st.session_state:
-            normalized_wf = normalize_wf(st.session_state.wf)
-
-            st.pyplot(plot_wf(normalized_wf))
-
-            st.session_state.test_wf_tag_gen = [(normalized_wf, 11)]
-            st.session_state.test_chks = list(
-                threshold_chunker(
-                    st.session_state.test_wf_tag_gen,
-                )
-            )
-            st.session_state.test_fvs = list(
-                threshold_featurizer(st.session_state.test_chks)
-            )
-
-            st.pyplot(
-                barplot_thresh(st.session_state.test_fvs, st.session_state.thresh)
-            )
-            test_thresh_df = mk_thresh_df(
+        st.session_state.test_wf_tag_gen = [(normalized_wf, 11)]
+        st.session_state.test_chks = list(
+            threshold_chunker(
                 st.session_state.test_wf_tag_gen,
-                st.session_state.thresh,
             )
-            write_intervals(test_thresh_df, st.session_state.thresh)
-
-            container = st.beta_container()
-            st.session_state.thresh_adjust = container.number_input(
-                "If you would like to adjust the thresh for this test, enter the amount here"
-            )
-            container.button(
-                "See the change", on_click=adjust_thresh, args=(container,)
-            )
-
-            st.button(
-                "Click here to run the model on your recording!", on_click=run_model
-            )
-
-            st.button("Clear current recording", on_click=clear_recording)
-
-        if "numbers" in st.session_state:
-            st.pyplot(
-                barplot_colored(st.session_state.test_fvs, st.session_state.results)
-            )
-            st.pyplot(mk_event_location_plot(st.session_state.results))
-            st.success(
-                "The detected phone digits are "
-                + "".join([str(num) for num in st.session_state.numbers])
-            )
-
-    if st.session_state.live == "Live":
-        st.session_state.live_wf = LiveWf(mic)
-        st.session_state.live_wf.start()
-
-        st.session_state.pressed = st.button("Press here to start!")
-
-        placeholder = st.empty()
-
-        st.button("Press here to stop!", on_click=stop)
-
-        store_in_ss("chk_stop", 8192)
-        store_in_ss(
-            "chunker",
-            partial(fixed_step_chunker, chk_size=DFLT_CHK_SIZE, chk_step=DFLT_CHK_STEP),
+        )
+        st.session_state.test_fvs = list(
+            threshold_featurizer(st.session_state.test_chks)
         )
 
-        while st.session_state.pressed:
-            (
-                st.session_state.bar_plt,
-                st.session_state.results,
-                st.session_state.number,
-                st.session_state.thresh_fvs,
-            ) = charts_for_live(
-                st.session_state.live_wf,
-                st.session_state.chk_stop,
-                st.session_state.chunker,
-                st.session_state.thresh,
-                st.session_state.featurizer,
-                st.session_state.model,
-            )
+        st.pyplot(barplot_thresh(st.session_state.test_fvs, st.session_state.thresh))
+        test_thresh_df = mk_thresh_df(
+            st.session_state.test_wf_tag_gen,
+            st.session_state.thresh,
+        )
+        write_intervals(test_thresh_df, st.session_state.thresh)
 
-            with placeholder.beta_container():
-                st.pyplot(st.session_state.bar_plt, clear_figure=False)
-                st.write("".join([str(num) for num in st.session_state.number]))
+        container = st.beta_container()
+        st.session_state.thresh_adjust = container.number_input(
+            "If you would like to adjust the thresh for this test, enter the amount here"
+        )
+        container.button("See the change", on_click=adjust_thresh, args=(container,))
 
-            st.session_state.chk_stop += 8192
+        st.button("Click here to run the model on your recording!", on_click=run_model)
 
-        st.session_state.live_wf.stop()
+        st.button("Clear current recording", on_click=clear_recording)
 
-        if "number" in st.session_state and not st.session_state.pressed:
-            with placeholder.beta_container():
-                st.pyplot(
-                    barplot_colored(
-                        st.session_state.thresh_fvs,
-                        st.session_state.results,
-                    )
-                )
-                # st.pyplot(mk_event_location_plot(st.session_state.results))
-                st.success(
-                    "The detected phone digits are "
-                    + "".join([str(num) for num in st.session_state.number])
-                )
+    if "numbers" in st.session_state:
+        st.pyplot(barplot_colored(st.session_state.test_fvs, st.session_state.results))
+        st.pyplot(mk_event_location_plot(st.session_state.results))
+        st.success(
+            "The detected phone digits are "
+            + "".join([str(num) for num in st.session_state.numbers])
+        )

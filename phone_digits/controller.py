@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 import matplotlib.pyplot as plt
+import augly.audio as audaugs
 
 from sklearn.base import BaseEstimator
 from sklearn.metrics import accuracy_score
@@ -20,7 +21,9 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
 from scipy.optimize import minimize_scalar
-from pickle import dump, load
+from pickle import dump, load, loads
+from io import BytesIO
+
 from slang import fixed_step_chunker
 from recode import ChunkedEncoder, ChunkedDecoder, StructCodecSpecs
 from py2store import LocalBinaryStore
@@ -113,6 +116,18 @@ def decode_dol(file_dir):
         featurizer,
         model,
     )
+
+
+# -------------------------------UPLOAD UTILS-------------------------------
+
+
+def upload_model(file):
+    return loads(file.read())
+
+
+def upload_audio(file):
+    wf, sr = sf.read(BytesIO(file.read()))
+    return audaugs.to_mono(wf, sr)
 
 
 # -------------------------------ANNOTATION UTILS-------------------------------
@@ -254,7 +269,7 @@ def get_cont_intervals(indices_list):
     return intervals
 
 
-def normalize_wf(wf):
+def normalize_wf_taped(wf):
     """
     Returns a normalized waveform using sklearn.preprocessing.normalize
 
@@ -263,6 +278,18 @@ def normalize_wf(wf):
     >>> assert np.all(normalized_wf == np.array([0.4472136, 0.8944272], dtype=np.float32))
     """
     new_wf = np.float32(np.array(wf)).reshape(1, -1)
+    return normalize(new_wf)[0]
+
+
+def normalize_wf_upload(wf):
+    """
+    Returns a normalized waveform using sklearn.preprocessing.normalize
+
+    >>> wf = [1,2]
+    >>> normalized_wf = normalize_wf(wf)
+    >>> assert np.all(normalized_wf == np.array([0.4472136, 0.8944272], dtype=np.float32))
+    """
+    new_wf = np.float32((wf * 32767).astype(np.int16)).reshape(1, -1)
     return normalize(new_wf)[0]
 
 

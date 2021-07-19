@@ -8,8 +8,7 @@ import random
 import base64
 
 from functools import partial
-from pickle import dumps, loads
-from io import BytesIO
+from pickle import dumps
 
 from slang import fixed_step_chunker
 from taped import LiveWf
@@ -41,10 +40,6 @@ def download_model(model, model_type, col):
     b64 = base64.b64encode(output_model).decode()
     href = f'<a href="data:file/output_model;base64,{b64}" download="{model_type}.pkl">Download trained {model_type} .pkl file</a>'
     col.markdown(href, unsafe_allow_html=True)
-
-
-def upload_model(file):
-    return loads(file.read())
 
 
 # -------------------------------STREAMLIT UTILS-------------------------------
