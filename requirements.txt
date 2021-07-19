@@ -12,3 +12,4 @@ scipy~=1.6.3
 recode~=0.1.11
 py2store~=0.1.2
 augly~=0.1.5
+torch
