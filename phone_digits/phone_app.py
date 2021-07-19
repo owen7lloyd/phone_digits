@@ -168,7 +168,7 @@ if "model" in st.session_state:
     )
 
     if test_audio:
-        st.session_state.wf, _ = upload_audio(test_audio)
+        st.session_state.wf = upload_audio(test_audio)
 
     if "wf" in st.session_state:
         wf = np.float()
