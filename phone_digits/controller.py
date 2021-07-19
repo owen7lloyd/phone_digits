@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import soundfile as sf
 import matplotlib.pyplot as plt
-import augly.audio as audaugs
 
 from sklearn.base import BaseEstimator
 from sklearn.metrics import accuracy_score
@@ -23,6 +22,7 @@ from sklearn.svm import SVC
 from scipy.optimize import minimize_scalar
 from pickle import dump, load, loads
 from io import BytesIO
+from librosa.core import to_mono
 
 from slang import fixed_step_chunker
 from recode import ChunkedEncoder, ChunkedDecoder, StructCodecSpecs
@@ -127,7 +127,7 @@ def upload_model(file):
 
 def upload_audio(file):
     wf, sr = sf.read(BytesIO(file.read()))
-    return audaugs.to_mono(wf, sr)
+    return to_mono(wf)
 
 
 # -------------------------------ANNOTATION UTILS-------------------------------
