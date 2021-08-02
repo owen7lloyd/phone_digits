@@ -1,5 +1,5 @@
 """
-Controller for streamlit app that needs session_state access
+Utils for streamlit app that needs session_state access
 """
 
 import streamlit as st
@@ -7,29 +7,14 @@ import numpy as np
 import random
 import base64
 
-from functools import partial
-from pickle import dumps, loads
-from io import BytesIO
-
-from slang import fixed_step_chunker
+from pickle import dumps
 from taped import LiveWf
-
-from controller import (
+from utils import (
     get_cont_intervals,
-    DFLT_CHK_SIZE,
-    DFLT_CHK_STEP,
-    chk_tag_gen,
     plot_wf,
-    mk_thresh_df,
+    barplot_colored,
+    mk_event_location_plot,
     barplot_thresh,
-    mk_thresh_chks,
-    chks_to_spectra,
-    mk_chks_and_noise_tags,
-    mk_results,
-    mk_number,
-    mk_chks_and_tags,
-    mk_featurizer,
-    mk_model,
 )
 
 
@@ -37,25 +22,30 @@ from controller import (
 
 
 def download_model(model, model_type, col):
+    """
+    Hack to download model with streamlit shairng
+    """
     output_model = dumps(model)
     b64 = base64.b64encode(output_model).decode()
-    href = f'<a href="data:file/output_model;base64,{b64}" download="{model_type}.pkl">Download trained {model_type} .pkl file</a>'
+    href = f'<a href="data:file/output_model;base64,{b64}" download="{model_type}.pkl">Download trained {model_type}.pkl file</a>'
     col.markdown(href, unsafe_allow_html=True)
-
-
-def upload_model(file):
-    return loads(file.read())
 
 
 # -------------------------------STREAMLIT UTILS-------------------------------
 
 
 def store_in_ss(key, value):
+    """
+    Stores the key-value pair passed in st.session_state if the key is not already present
+    """
     if key not in st.session_state:
         st.session_state[key] = value
 
 
 def annotations():
+    """
+    Helper widget to generate annotations to optimize the threshold
+    """
     if "annotations" not in st.session_state:
         st.session_state.annotations = {}
         st.session_state.current_chk = st.session_state.random_chk_ids[0]
@@ -108,6 +98,9 @@ def annotations():
 
 
 def write_intervals(thresh_df, thresh):
+    """
+    Writes the number of continuous intervals at a given thresh value
+    """
     st.write(
         f"There are {len(get_cont_intervals(thresh_df[thresh_df['meets_thresh'] == 1].index))} "
         f"continuous intervals with thresh at {thresh}."
@@ -115,84 +108,80 @@ def write_intervals(thresh_df, thresh):
 
 
 def clear_recording():
-    keys = ["wf", "test_wf_tag_gen", "thresh_adjust", "numbers"]
+    """
+    Clears the current recording from st.session_state and TestController
+    """
+    st.session_state.TestController.clear_recording()
+
+    keys = ["wf", "results", "test_fvs", "number", "thresh_adjust"]
     for key in keys:
         if key in st.session_state:
             st.session_state.__delattr__(key)
-
-
-def mk_featurizer_and_model(featurizer_choice, model_choice):
-    chks, tags = mk_chks_and_tags(
-        st.session_state.dacc,
-        partial(
-            fixed_step_chunker,
-            chk_size=DFLT_CHK_SIZE,
-            chk_step=DFLT_CHK_STEP,
-        ),
-        st.session_state.thresh_chks,
-    )
-    fvs, featurizer = mk_featurizer(chks, tags, featurizer_choice)
-    model = mk_model(fvs, tags, model_choice)
-
-    st.session_state.featurizer = featurizer
-    st.session_state.model = model
-    st.session_state.fvs = fvs
-    st.session_state.tags = tags
 
 
 # -------------------------------TAPED UTILS-------------------------------
 
 
 def record(input_device, length):
-    with LiveWf() as live_audio_stream:
+    """
+    Creates a waveform from a recording generated with given input device and length
+    """
+    with LiveWf(input_device) as live_audio_stream:
         wf = np.array(live_audio_stream[22_050 : 22_050 + length * 44_100])
     st.session_state.wf = wf
 
 
 def stop():
+    """
+    Stops the recording for livestream data
+    """
     st.session_state.pressed = False
 
 
 # -------------------------------MODEL UTILS-------------------------------
 
 
-def adjust_thresh(container):
+def show_adjustment(container):
+    """
+    Show the affect of an adjustment to threshold level on continous intervals
+    """
     with container:
-        test_thresh_df = mk_thresh_df(
-            st.session_state.test_wf_tag_gen,
-            st.session_state.thresh + st.session_state.thresh_adjust,
+        thresh_df, barplot = st.session_state.TestController.adjust_thresh(
+            st.session_state.thresh_adjust
         )
         write_intervals(
-            test_thresh_df, st.session_state.thresh + st.session_state.thresh_adjust
+            thresh_df,
+            st.session_state.TestController.threshold + st.session_state.thresh_adjust,
         )
-        st.pyplot(
-            barplot_thresh(
-                st.session_state.test_fvs,
-                st.session_state.thresh + st.session_state.thresh_adjust,
-            )
-        )
+        st.pyplot(barplot)
 
 
 def run_model():
-    test_thresh_df = mk_thresh_df(
-        st.session_state.test_wf_tag_gen,
-        st.session_state.thresh + st.session_state.thresh_adjust,
+    """
+    Run the model on the test waveform
+    """
+    test_fvs, results, phone_number = st.session_state.TestController.test_model(
+        st.session_state.thresh_adjust
     )
-    test_thresh_chks = mk_thresh_chks(test_thresh_df)
+    st.session_state.thresh_fvs = test_fvs
+    st.session_state.results = results
+    st.session_state.number = phone_number
 
-    chunker = partial(
-        fixed_step_chunker, chk_size=DFLT_CHK_SIZE, chk_step=DFLT_CHK_STEP
-    )
 
-    chks_and_tags_enum = list(
-        enumerate(list(chk_tag_gen(st.session_state.test_wf_tag_gen, chunker)))
-    )
-
-    chks, noise_tags = mk_chks_and_noise_tags(chks_and_tags_enum, test_thresh_chks)
-
-    spectra = chks_to_spectra(chks)
-    test_fvs = st.session_state.featurizer.transform(spectra)
-    scores = list(st.session_state.model.predict(test_fvs))
-
-    st.session_state.results = mk_results(noise_tags, scores)
-    st.session_state.numbers = mk_number(st.session_state.results)
+def display_results(final=True):
+    """
+    Display the results using a colored barplot and event location plot
+    """
+    if final:
+        st.pyplot(
+            barplot_colored(st.session_state.thresh_fvs, st.session_state.results)
+        )
+        st.pyplot(mk_event_location_plot(st.session_state.results))
+        st.success(
+            "The detected phone digits are "
+            + "".join([str(num) for num in st.session_state.number])
+        )
+    else:
+        st.pyplot(st.session_state.plt, clear_figure=False)
+        st.pyplot(mk_event_location_plot(st.session_state.results))
+        st.write("".join([str(num) for num in st.session_state.number]))
