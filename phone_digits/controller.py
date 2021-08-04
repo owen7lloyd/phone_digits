@@ -63,7 +63,7 @@ class PhoneDigitsController(SmartChunkingController):
         thresh_chk_ids = np.array(
             list(enumerate(np.ones(len(thresh_chks)))), dtype=int
         )[:, 0]
-        random_thresh_chk_ids = np.random.choice(thresh_chk_ids, 2)
+        random_thresh_chk_ids = np.random.choice(thresh_chk_ids, 5)
         return thresh_chks, thresh_chk_ids, random_thresh_chk_ids
 
     def train_thresh_model(self, annots):
